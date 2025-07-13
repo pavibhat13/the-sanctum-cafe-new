@@ -243,7 +243,7 @@ self.addEventListener('push', (event) => {
       const itemsText = itemCount === 1 ? '1 item' : `${itemCount} items`;
       
       options.title = `🆕 New Order #${orderId}`;
-      options.body = `${customerName} placed an order (${itemsText}) for $${total}`;
+      options.body = `${customerName} placed an order (${itemsText}) for ₹${total}`;
       options.tag = `order-${orderId}`;
       options.data.url = `/admin/orders?highlight=${orderId}`;
       options.actions = [
