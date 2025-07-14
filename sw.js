@@ -99,6 +99,17 @@ self.addEventListener('fetch', (event) => {
 
   // Handle API requests
   if (url.pathname.startsWith('/api/')) {
+    // Don't intercept authentication-related requests to avoid session conflicts
+    const isAuthRequest = url.pathname.includes('/auth/') || 
+                         url.pathname.includes('/verify') || 
+                         url.pathname.includes('/refresh');
+    
+    if (isAuthRequest) {
+      // Let authentication requests pass through directly without caching
+      event.respondWith(fetch(request));
+      return;
+    }
+
     event.respondWith(
       fetch(request)
         .then((response) => {
@@ -112,44 +123,52 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => {
-          // If offline, try to serve from cache (only for GET requests)
-          if (request.method === 'GET') {
-            return caches.match(request)
-              .then((cachedResponse) => {
-                if (cachedResponse) {
-                  return cachedResponse;
-                }
-                // Return a generic offline response for API calls
-                return new Response(
-                  JSON.stringify({
-                    error: 'Offline',
-                    message: 'This feature is not available offline'
-                  }),
-                  {
-                    status: 503,
-                    statusText: 'Service Unavailable',
-                    headers: {
-                      'Content-Type': 'application/json'
-                    }
+        .catch((error) => {
+          console.log('SW: API request failed:', url.pathname, error.message);
+          
+          // Check if we're actually offline vs other network errors
+          if (!navigator.onLine) {
+            // If offline, try to serve from cache (only for GET requests)
+            if (request.method === 'GET') {
+              return caches.match(request)
+                .then((cachedResponse) => {
+                  if (cachedResponse) {
+                    return cachedResponse;
                   }
-                );
-              });
-          } else {
-            // For non-GET requests when offline, return appropriate error
-            return new Response(
-              JSON.stringify({
-                error: 'Offline',
-                message: 'Cannot perform this action while offline'
-              }),
-              {
-                status: 503,
-                statusText: 'Service Unavailable',
-                headers: {
-                  'Content-Type': 'application/json'
+                  // Return a generic offline response for API calls
+                  return new Response(
+                    JSON.stringify({
+                      error: 'Offline',
+                      message: 'This feature is not available offline'
+                    }),
+                    {
+                      status: 503,
+                      statusText: 'Service Unavailable',
+                      headers: {
+                        'Content-Type': 'application/json'
+                      }
+                    }
+                  );
+                });
+            } else {
+              // For non-GET requests when offline, return appropriate error
+              return new Response(
+                JSON.stringify({
+                  error: 'Offline',
+                  message: 'Cannot perform this action while offline'
+                }),
+                {
+                  status: 503,
+                  statusText: 'Service Unavailable',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  }
                 }
-              }
-            );
+              );
+            }
+          } else {
+            // If online but request failed, re-throw the error to let the app handle it
+            throw error;
           }
         })
     );
