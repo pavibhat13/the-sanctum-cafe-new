@@ -74,22 +74,25 @@ self.addEventListener('fetch', (event) => {
         .then((response) => {
           // If online, return the response and cache it (only for GET requests)
           if (request.method === 'GET' && response.status === 200) {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME)
-              .then((cache) => {
-                cache.put(request, responseClone);
-              });
+            // Only cache http/https protocols to avoid chrome-extension errors
+            if (url.protocol.startsWith('http')) {
+              const responseClone = response.clone();
+              caches.open(CACHE_NAME)
+                .then((cache) => {
+                  cache.put(request, responseClone);
+                });
+            }
           }
           return response;
         })
         .catch(() => {
-          // If offline, try to serve from cache
-          return caches.match(request)
+          // If offline or fetch fails, try to serve index.html (SPA fallback)
+          return caches.match('/')
             .then((cachedResponse) => {
               if (cachedResponse) {
                 return cachedResponse;
               }
-              // If no cached version, serve offline page
+              // If no cached root, try offline page
               return caches.match(OFFLINE_URL);
             });
         })
@@ -115,11 +118,17 @@ self.addEventListener('fetch', (event) => {
         .then((response) => {
           // Only cache GET requests with successful responses
           if (response.status === 200 && request.method === 'GET') {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME)
-              .then((cache) => {
-                cache.put(request, responseClone);
-              });
+            // Don't cache settings or management data too aggressively
+            const isManagementData = url.pathname.includes('/api/settings') || 
+                                    url.pathname.includes('/api/management');
+            
+            if (!isManagementData && url.protocol.startsWith('http')) {
+              const responseClone = response.clone();
+              caches.open(CACHE_NAME)
+                .then((cache) => {
+                  cache.put(request, responseClone);
+                });
+            }
           }
           return response;
         })
