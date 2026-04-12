@@ -102,14 +102,16 @@ self.addEventListener('fetch', (event) => {
 
   // Handle API requests
   if (url.pathname.startsWith('/api/')) {
-    // Don't intercept authentication-related requests to avoid session conflicts
+    // Don't intercept authentication or management-related requests to avoid conflicts and errors
     const isAuthRequest = url.pathname.includes('/auth/') || 
                          url.pathname.includes('/verify') || 
                          url.pathname.includes('/refresh');
     
-    if (isAuthRequest) {
-      // Let authentication requests pass through directly without caching
-      event.respondWith(fetch(request));
+    const isManagementRequest = url.pathname.includes('/management/') || 
+                               url.pathname.includes('/api/settings');
+    
+    if (isAuthRequest || isManagementRequest) {
+      // Let these requests pass through directly without SW interception
       return;
     }
 
